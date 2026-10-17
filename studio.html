@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>LumenForge CAD — Parametric 3D-Printable Lampshade Studio</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -115,28 +115,125 @@
             color: #fbbf24;
             border-color: rgba(245, 158, 11, 0.5);
         }
+        /* Fill the visible viewport (100vh overshoots behind mobile browser toolbars) */
+        .app-shell {
+            height: 100vh;
+            height: 100dvh;
+            width: 100%;
+        }
+        /* Let the canvas own every touch gesture instead of the page scrolling/zooming */
+        #viewport-canvas {
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Finger-sized slider thumbs on touch screens */
+        @media (pointer: coarse) {
+            input[type="range"] {
+                height: 8px;
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                width: 24px;
+                height: 24px;
+            }
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #f59e0b;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+        }
+        @media (pointer: coarse) {
+            input[type="range"]::-moz-range-thumb {
+                width: 22px;
+                height: 22px;
+            }
+        }
+
+        /* MOBILE / TABLET: controls become a bottom sheet beneath the viewport */
+        @media (max-width: 1023px) {
+            #controls-panel {
+                order: 2;
+                max-height: 46dvh;
+                border-top: 1px solid rgba(40, 48, 66, 0.8);
+                border-bottom: 0;
+                padding-bottom: env(safe-area-inset-bottom);
+                transition: max-height 0.25s ease;
+            }
+            #controls-panel.sheet-collapsed {
+                max-height: none;
+            }
+            #controls-panel.sheet-collapsed .sheet-body {
+                display: none;
+            }
+            #controls-panel.sheet-collapsed #sheet-toggle-icon {
+                transform: rotate(180deg);
+            }
+        }
+        @media (min-width: 1024px) {
+            #sheet-toggle {
+                display: none;
+            }
+        }
+
+        /* PHONES IN LANDSCAPE: side-by-side, controls in a narrow scrolling column */
+        @media (max-width: 1023px) and (max-height: 520px) and (orientation: landscape) {
+            #workspace {
+                flex-direction: row;
+            }
+            #controls-panel,
+            #controls-panel.sheet-collapsed {
+                order: 0;
+                width: 300px;
+                max-height: none;
+                border-top: 0;
+                border-right: 1px solid rgba(40, 48, 66, 0.8);
+                padding-left: env(safe-area-inset-left);
+                padding-bottom: 0;
+            }
+            #controls-panel.sheet-collapsed .sheet-body {
+                display: block;
+            }
+            #controls-panel.sheet-collapsed .sheet-body.flex {
+                display: flex;
+            }
+            #sheet-toggle {
+                display: none;
+            }
+            #app-header {
+                height: 3rem;
+            }
+            #viewport-hud,
+            #camera-views,
+            #controls-panel #controls-footer,
+            .mode-label {
+                display: none !important;
+            }
+        }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col font-sans antialiased">
+<body class="app-shell flex flex-col font-sans antialiased">
 
     <!-- TOP NAVIGATION BAR -->
-    <header class="h-14 bg-studio-900 border-b border-studio-700/80 px-4 flex items-center justify-between shrink-0 z-30">
+    <header id="app-header" class="h-14 bg-studio-900 border-b border-studio-700/80 px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-30">
         <!-- Brand & Status -->
-        <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+        <a href="/" class="flex items-center gap-2 sm:gap-3 shrink-0" title="LumenForge home">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
                 <i data-lucide="lamp" class="w-5 h-5 text-studio-950 stroke-[2.2]"></i>
             </div>
             <div>
                 <div class="flex items-center gap-2">
                     <span class="font-bold tracking-tight text-sm md:text-base text-white">LUMENFORGE</span>
-                    <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold">CAD v2.4</span>
+                    <span class="hidden sm:inline whitespace-nowrap text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold">CAD v2.4</span>
                 </div>
-                <p class="text-[11px] text-slate-400 hidden sm:block">Parametric 3D-Printable Lampshade Studio</p>
+                <p class="text-[11px] text-slate-400 hidden lg:block">Parametric 3D-Printable Lampshade Studio</p>
             </div>
-        </div>
+        </a>
 
         <!-- Preset Selector Bar -->
-        <div class="hidden xl:flex items-center gap-1.5 bg-studio-950/90 p-1 rounded-lg border border-studio-700/70">
+        <div class="hidden 2xl:flex items-center gap-1.5 bg-studio-950/90 p-1 rounded-lg border border-studio-700/70">
             <span class="text-[11px] font-mono text-slate-400 px-2">PRESETS:</span>
             <button onclick="applyPreset('nordic')" class="preset-btn px-2.5 py-1 text-xs rounded-md hover:bg-studio-800 text-slate-300 transition">Nordic Pleat</button>
             <button onclick="applyPreset('lotus')" class="preset-btn px-2.5 py-1 text-xs rounded-md hover:bg-studio-800 text-slate-300 transition">Twisted Lotus</button>
@@ -153,11 +250,11 @@
         </div>
 
         <!-- Lamp Toggle & Export STL Actions -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
             <!-- Quick Lamp Switch -->
-            <button id="header-lamp-toggle" onclick="toggleLampPower()" class="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 border transition bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10">
+            <button id="header-lamp-toggle" onclick="toggleLampPower()" title="Toggle bulb" class="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 border transition bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10">
                 <i data-lucide="lightbulb" class="w-4 h-4"></i>
-                <span id="header-lamp-label">Bulb: ON</span>
+                <span id="header-lamp-label" class="hidden sm:inline">Bulb: ON</span>
             </button>
 
             <!-- Mesh Quality Selector -->
@@ -170,24 +267,34 @@
             <!-- Export Binary STL -->
             <button onclick="exportSTL(true)" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-studio-950 font-semibold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition active:scale-95">
                 <i data-lucide="download" class="w-4 h-4 stroke-[2.2]"></i>
-                <span>Export Binary STL</span>
+                <span class="hidden sm:inline">Export Binary STL</span>
+                <span class="sm:hidden">STL</span>
             </button>
 
             <!-- Export ASCII STL -->
-            <button onclick="exportSTL(false)" class="bg-studio-800 hover:bg-studio-700 text-slate-200 border border-studio-600 text-xs px-2.5 py-2 rounded-lg hidden md:flex items-center gap-1 transition" title="Export ASCII STL format">
+            <button onclick="exportSTL(false)" class="bg-studio-800 hover:bg-studio-700 text-slate-200 border border-studio-600 text-xs px-2.5 py-2 rounded-lg hidden lg:flex items-center gap-1 transition" title="Export ASCII STL format">
                 <span class="font-mono text-[11px]">ASCII</span>
             </button>
         </div>
     </header>
 
     <!-- MAIN WORKSPACE -->
-    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+    <div id="workspace" class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
 
         <!-- LEFT SIDEBAR: PARAMETRIC CONTROLS -->
-        <aside class="w-full lg:w-[390px] xl:w-[420px] bg-studio-900 border-b lg:border-b-0 lg:border-r border-studio-700/80 flex flex-col shrink-0 z-20 max-h-[48vh] lg:max-h-full">
+        <aside id="controls-panel" class="w-full lg:w-[390px] xl:w-[420px] bg-studio-900 lg:border-r border-studio-700/80 flex flex-col shrink-0 z-20 lg:max-h-full">
+
+            <!-- Mobile Sheet Handle -->
+            <button id="sheet-toggle" onclick="toggleControlsSheet()" class="w-full flex items-center justify-between px-4 pt-2 pb-1 shrink-0 text-[11px] font-mono uppercase tracking-wider text-slate-400" aria-expanded="true" aria-controls="controls-panel">
+                <span class="flex items-center gap-2">
+                    <span class="w-8 h-1 rounded-full bg-studio-600"></span>
+                    <span id="sheet-toggle-label">Hide controls</span>
+                </span>
+                <i id="sheet-toggle-icon" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+            </button>
 
             <!-- Mobile Presets Row -->
-            <div class="flex xl:hidden items-center gap-1.5 overflow-x-auto px-3 py-2 bg-studio-950 border-b border-studio-800 shrink-0">
+            <div class="sheet-body flex 2xl:hidden items-center gap-1.5 overflow-x-auto px-3 py-2 bg-studio-950 border-b border-studio-800 shrink-0">
                 <span class="text-[10px] font-mono text-slate-400 shrink-0">PRESET:</span>
                 <button onclick="applyPreset('nordic')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Nordic</button>
                 <button onclick="applyPreset('lotus')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Lotus</button>
@@ -195,6 +302,7 @@
                 <button onclick="applyPreset('beehive')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Beehive</button>
                 <button onclick="applyPreset('origami')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Origami</button>
                 <button onclick="applyPreset('voronoi')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Cellular</button>
+                <button onclick="applyPreset('vase')" class="px-2 py-1 text-[11px] rounded bg-studio-800 text-slate-300 shrink-0">Vase</button>
                 <button onclick="randomizeDesign()" class="px-2 py-1 text-[11px] rounded bg-indigo-500/20 text-indigo-300 shrink-0">Mutate</button>
             </div>
 
@@ -219,7 +327,7 @@
             </div>
 
             <!-- Scrollable Controls Container -->
-            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+            <div class="sheet-body flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-5">
 
                 <!-- TAB 1: DIMENSIONS & PROFILE CURVE -->
                 <div id="tab-geometry" class="space-y-4">
@@ -615,7 +723,7 @@
             </div>
 
             <!-- SIDEBAR FOOTER: SLICER RECOMMENDATION -->
-            <div class="p-3 bg-studio-950 border-t border-studio-800 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
+            <div id="controls-footer" class="sheet-body p-3 bg-studio-950 border-t border-studio-800 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span>Manifold Watertight Solid</span>
@@ -631,22 +739,22 @@
             <div class="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-10">
                 <!-- Inspection Modes -->
                 <div class="glass-panel p-1 rounded-xl flex items-center gap-1 pointer-events-auto shadow-xl">
-                    <button onclick="setRenderMode('lit')" id="mode-lit" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition">
+                    <button onclick="setRenderMode('lit')" id="mode-lit" title="Lit Translucency" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition">
                         <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                        <span>Lit Translucency</span>
+                        <span class="mode-label hidden sm:inline">Lit Translucency</span>
                     </button>
-                    <button onclick="setRenderMode('clay')" id="mode-clay" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-studio-800 border border-transparent flex items-center gap-1.5 transition">
+                    <button onclick="setRenderMode('clay')" id="mode-clay" title="CAD Studio" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-studio-800 border border-transparent flex items-center gap-1.5 transition">
                         <i data-lucide="box" class="w-3.5 h-3.5"></i>
-                        <span>CAD Studio</span>
+                        <span class="mode-label hidden sm:inline">CAD Studio</span>
                     </button>
                     <button onclick="setRenderMode('overhang')" id="mode-overhang" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-studio-800 border border-transparent flex items-center gap-1.5 transition" title="Visualize 3D Print Overhang Angles">
                         <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
-                        <span>Overhang Analysis</span>
+                        <span class="mode-label hidden sm:inline">Overhang Analysis</span>
                     </button>
                     <div class="h-4 w-[1px] bg-studio-700 mx-0.5"></div>
                     <button onclick="toggleCutaway()" id="btn-cutaway" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-studio-800 border border-transparent flex items-center gap-1 transition" title="Cross-Section Cutaway View">
                         <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
-                        <span class="hidden sm:inline">Section Cut</span>
+                        <span class="mode-label hidden sm:inline">Section Cut</span>
                     </button>
                     <button onclick="toggleWireframe()" id="btn-wireframe" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-studio-800 border border-transparent flex items-center gap-1 transition" title="Toggle Mesh Wireframe">
                         <i data-lucide="grid" class="w-3.5 h-3.5"></i>
@@ -654,7 +762,7 @@
                 </div>
 
                 <!-- Camera Quick Angles -->
-                <div class="glass-panel p-1 rounded-xl hidden sm:flex items-center gap-1 pointer-events-auto shadow-xl">
+                <div id="camera-views" class="glass-panel p-1 rounded-xl hidden sm:flex items-center gap-1 pointer-events-auto shadow-xl">
                     <button onclick="setCameraView('iso')" class="px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-studio-800 transition">3D Iso</button>
                     <button onclick="setCameraView('front')" class="px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-studio-800 transition">Front</button>
                     <button onclick="setCameraView('top')" class="px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-studio-800 transition">Top</button>
@@ -690,17 +798,17 @@
             </div>
 
             <!-- BOTTOM FLOATING 3D PRINTABILITY & SLICER DIAGNOSTICS HUD -->
-            <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-end justify-between gap-3 pointer-events-none z-10">
+            <div id="viewport-hud" class="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 flex flex-wrap items-end justify-between gap-3 pointer-events-none z-10">
 
                 <!-- Printability Telemetry Card -->
-                <div class="glass-panel px-4 py-3 rounded-xl pointer-events-auto shadow-2xl flex flex-wrap items-center gap-4 sm:gap-6">
+                <div class="glass-panel px-3 py-2 sm:px-4 sm:py-3 rounded-xl pointer-events-auto shadow-2xl flex flex-wrap items-center gap-4 sm:gap-6">
                     <!-- Print Status Badge -->
                     <div class="flex items-center gap-2.5">
                         <div id="printability-icon-box" class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                             <i data-lucide="check-circle-2" class="w-5 h-5"></i>
                         </div>
                         <div>
-                            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Printability Check</div>
+                            <div class="hidden sm:block text-[10px] font-mono uppercase tracking-wider text-slate-400">Printability Check</div>
                             <div id="printability-badge-text" class="text-xs font-semibold text-emerald-300">Support-Free Printable</div>
                         </div>
                     </div>
@@ -708,7 +816,7 @@
                     <div class="h-7 w-[1px] bg-studio-700 hidden sm:block"></div>
 
                     <!-- Bounding Volume -->
-                    <div>
+                    <div class="hidden sm:block">
                         <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Build Volume (X×Y×Z)</div>
                         <div id="hud-dimensions" class="text-xs font-mono font-semibold text-white">205 × 205 × 180 mm</div>
                     </div>
@@ -741,7 +849,7 @@
             </div>
 
             <!-- Toast Notification for STL Export -->
-            <div id="export-toast" class="fixed bottom-6 right-6 glass-panel px-4 py-3 rounded-xl border border-amber-500/50 shadow-2xl flex items-center gap-3 transform translate-y-24 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+            <div id="export-toast" class="fixed top-16 left-3 right-3 sm:top-auto sm:left-auto sm:bottom-6 sm:right-6 glass-panel px-4 py-3 rounded-xl border border-amber-500/50 shadow-2xl flex items-center gap-3 transform translate-y-24 opacity-0 transition-all duration-300 z-50 pointer-events-none">
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                     <i data-lucide="check" class="w-5 h-5"></i>
                 </div>
@@ -882,6 +990,9 @@
 
             // Window Resize Listener
             window.addEventListener('resize', onWindowResize);
+            if (window.ResizeObserver) {
+                new ResizeObserver(onWindowResize).observe(document.getElementById('canvas-container'));
+            }
 
             // Initial Mesh Build
             rebuildLampshadeMesh();
@@ -1938,7 +2049,16 @@
         // ============================================================================
         // 8. UI CONTROLS, PRESETS & INTERACTIVITY HANDLERS
         // ============================================================================
+        function toggleControlsSheet(forceOpen) {
+            const panel = document.getElementById('controls-panel');
+            const collapse = forceOpen ? false : !panel.classList.contains('sheet-collapsed');
+            panel.classList.toggle('sheet-collapsed', collapse);
+            document.getElementById('sheet-toggle').setAttribute('aria-expanded', String(!collapse));
+            document.getElementById('sheet-toggle-label').textContent = collapse ? 'Show controls' : 'Hide controls';
+        }
+
         function switchTab(tabName) {
+            toggleControlsSheet(true);
             const tabs = ['geometry', 'pattern', 'fitter', 'lighting'];
             tabs.forEach(t => {
                 const panel = document.getElementById(`tab-${t}`);
